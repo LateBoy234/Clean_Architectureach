@@ -1,0 +1,20 @@
+<UserControl x:Class="AmpClean.Presentation.Views.PathsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <materialDesign:Card Padding="22">
+        <Grid>
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <StackPanel><TextBlock Text="运动平台路径" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="路径点以 JSON 持久化；接入硬件 SDK 后可扩展可视化编辑器。" Foreground="#6B7280" Margin="0,5,0,16" /></StackPanel>
+            <DataGrid Grid.Row="1" ItemsSource="{Binding Items}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="路径名称" Binding="{Binding Name}" Width="2*" />
+                    <DataGridTextColumn Header="平台" Binding="{Binding DeviceName}" Width="2*" />
+                    <DataGridTextColumn Header="安全 Z 高度" Binding="{Binding SafeZ, StringFormat={}{0:F2} mm}" Width="140" />
+                    <DataGridTextColumn Header="路径点" Binding="{Binding PointsJson}" Width="3*" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+    </materialDesign:Card>
+</UserControl>

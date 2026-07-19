@@ -1,0 +1,6 @@
+bin/
+obj/
+.vs/
+*.user
+src/AmpClean.Presentation/Data/
+TestResults/
