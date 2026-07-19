@@ -23,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AmpClean.Application\AmpClean.Application.csproj" />
     <ProjectReference Include="..\..\src\AmpClean.Domain\AmpClean.Domain.csproj" />
+    <ProjectReference Include="..\..\src\AmpClean.Infrastructure\AmpClean.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

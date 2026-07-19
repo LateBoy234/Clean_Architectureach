@@ -3,9 +3,13 @@ using System.Text.Json;
 using System.Windows;
 using AmpClean.Application.Abstractions.Infrastructure;
 using AmpClean.Application.Abstractions.Persistence;
+using AmpClean.Application.Abstractions.Algorithms;
+using AmpClean.Application.Algorithms;
 using AmpClean.Application.Services;
+using AmpClean.Application.Measurement;
 using AmpClean.Infrastructure.Hardware;
 using AmpClean.Infrastructure.Persistence;
+using AmpClean.Infrastructure.Simulation;
 using AmpClean.Presentation.ViewModels;
 using Autofac;
 
@@ -55,18 +59,25 @@ public partial class App : System.Windows.Application
 
         // 基础设施实现：替换数据库或硬件时，仅修改组合根注册。
         builder.RegisterInstance(settings.Database).SingleInstance();
+        builder.RegisterInstance(settings.Simulation).SingleInstance();
         builder.RegisterType<SqlSugarContext>().SingleInstance();
         builder.RegisterType<DatabaseInitializer>().SingleInstance();
         builder.RegisterGeneric(typeof(SqlSugarRepository<>)).As(typeof(IRepository<>)).SingleInstance();
         builder.RegisterType<SimulatedHardwareStatusService>().As<IHardwareStatusService>().SingleInstance();
+        builder.RegisterType<MeasurementPointProvider>().As<IMeasurementPointProvider>().SingleInstance();
+        builder.RegisterType<DatabaseSimulatedMotionController>().As<IMotionController>().SingleInstance();
+        builder.RegisterType<FakeMeasurementInstrument>().As<IMeasurementInstrument>().SingleInstance();
 
         // 应用用例与 ViewModel 全部使用构造函数注入。
         builder.RegisterType<DashboardService>().SingleInstance();
         builder.RegisterType<MeasureConfigService>().SingleInstance();
+        builder.RegisterType<MeasurementWorkflow>().SingleInstance();
+        builder.RegisterType<RlsCalibrationCalculator>().As<IRlsCalibrationCalculator>().SingleInstance();
         builder.RegisterType<DashboardViewModel>().SingleInstance();
         builder.RegisterType<ConfigsViewModel>().SingleInstance();
         builder.RegisterType<PathsViewModel>().SingleInstance();
         builder.RegisterType<ReportsViewModel>().SingleInstance();
+        builder.RegisterType<MeasureViewModel>().SingleInstance();
         builder.RegisterType<MainViewModel>().SingleInstance();
         builder.RegisterType<MainWindow>();
         return builder.Build();
@@ -83,5 +94,6 @@ public partial class App : System.Windows.Application
     private sealed class AppSettings
     {
         public DatabaseOptions Database { get; init; } = new();
+        public SimulationOptions Simulation { get; init; } = new();
     }
 }

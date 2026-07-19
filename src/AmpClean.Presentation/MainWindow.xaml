@@ -10,6 +10,7 @@
     <Window.Resources>
         <!-- ViewModel 到 View 的映射让导航不需要在代码隐藏中创建页面。 -->
         <DataTemplate DataType="{x:Type vm:DashboardViewModel}"><views:DashboardView /></DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MeasureViewModel}"><views:MeasureView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:ConfigsViewModel}"><views:ConfigsView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:PathsViewModel}"><views:PathsView /></DataTemplate>
         <DataTemplate DataType="{x:Type vm:ReportsViewModel}"><views:ReportsView /></DataTemplate>

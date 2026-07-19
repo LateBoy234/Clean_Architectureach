@@ -89,3 +89,47 @@ dotnet run --project src/AmpClean.Presentation
 4. 将测量流程拆成 Application 用例；UI 只调用命令并展示状态。
 
 > 当前项目是架构骨架和可运行的 CRUD 样例，没有直接复制 AMP 的闭源/硬件 DLL、算法和完整计量流程。这样可以先稳定边界，再逐个迁移业务，避免把旧单体耦合一并带入新架构。
+
+## 三轴自动测量模拟
+
+“自动测量”页面使用数据库中的 `MeasurementPoint` 点位表驱动三轴模拟运动。默认移动到下一点需要 2 秒，到位后假仪器生成 8 个测量值；模拟平台的当前位置会写入 `SimulationAxisState` 表。
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> LoadingPoints: 自动测量
+    LoadingPoints --> Moving: 已读取数据库点位
+    Moving --> Measuring: 三轴到位
+    Measuring --> Moving: 还有下一点
+    Measuring --> Completed: 全部完成
+    Moving --> Paused: 停止
+    Measuring --> Paused: 停止
+    Paused --> Moving: 继续测量
+    Paused --> Homing: 回到原点
+    Completed --> Homing: 回到原点
+    Homing --> Idle: 回零完成
+    Moving --> Faulted: 设备异常
+    Measuring --> Faulted: 仪器异常
+```
+
+模拟时间可在 `src/AmpClean.Presentation/appsettings.json` 中调整：
+
+```json
+"Simulation": {
+  "MoveIntervalMilliseconds": 2000,
+  "MeasureDurationMilliseconds": 0
+}
+```
+
+真实硬件接入时分别实现 `IMotionController` 和 `IMeasurementInstrument`，再替换 `App.xaml.cs` 中的 Autofac 注册即可；`MeasurementWorkflow` 状态机和 `MeasureViewModel` 不需要修改。
+
+### 仪器校准与 RLS
+
+进入“自动测量”页面时，`MeasureViewModel.InitializeAsync` 会调用 `IMeasurementInstrument.ReadCalibrationDataAsync`：
+
+1. 将仪器校准实测矩阵展平显示到 `ReadDataList`。
+2. 将实测矩阵和标准矩阵传入 `RlsCalibrationCalculator`。
+3. 将 RLS 回归系数矩阵显示到 `ResultDataList`。
+4. 只有校准读取及计算成功后才允许启动自动测量。
+
+当前模拟仪器提供 12×8 的实测矩阵和 12×3 的标准矩阵，RLS 输出 8×3 的系数矩阵。算法移植自 `sqcx-main/AMP/Algorithm/RLSAlgorithm.cs`，并将原来的 `Dictionary<string, object>` 返回值替换为强类型 `RlsCalculationResult`。

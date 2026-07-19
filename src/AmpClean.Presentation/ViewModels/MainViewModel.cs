@@ -5,10 +5,11 @@ using MaterialDesignThemes.Wpf;
 
 namespace AmpClean.Presentation.ViewModels;
 
-/// <summary>主窗口只做页面导航；业务分别下沉到各页面 ViewModel。</summary>
+/// <summary>主窗口只负责页面导航，具体业务由各页面 ViewModel 承担。</summary>
 public partial class MainViewModel : ObservableObject
 {
     private readonly DashboardViewModel _dashboard;
+    private readonly MeasureViewModel _measure;
     private readonly ConfigsViewModel _configs;
     private readonly PathsViewModel _paths;
     private readonly ReportsViewModel _reports;
@@ -16,10 +17,11 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private object? _currentPage;
     [ObservableProperty] private string _currentTitle = "运行概览";
 
-    public MainViewModel(DashboardViewModel dashboard, ConfigsViewModel configs,
-        PathsViewModel paths, ReportsViewModel reports)
+    public MainViewModel(DashboardViewModel dashboard, MeasureViewModel measure,
+        ConfigsViewModel configs, PathsViewModel paths, ReportsViewModel reports)
     {
         _dashboard = dashboard;
+        _measure = measure;
         _configs = configs;
         _paths = paths;
         _reports = reports;
@@ -29,6 +31,7 @@ public partial class MainViewModel : ObservableObject
     public ObservableCollection<NavigationItem> NavigationItems { get; } =
     [
         new("dashboard", "运行概览", PackIconKind.ViewDashboardOutline),
+        new("measure", "自动测量", PackIconKind.AxisArrow),
         new("configs", "测量配置", PackIconKind.TuneVariant),
         new("paths", "运动路径", PackIconKind.MapMarkerPath),
         new("reports", "报告管理", PackIconKind.FileChartOutline)
@@ -42,6 +45,11 @@ public partial class MainViewModel : ObservableObject
     {
         switch (key)
         {
+            case "measure":
+                CurrentTitle = "自动测量";
+                CurrentPage = _measure;
+                await _measure.InitializeAsync();
+                break;
             case "configs":
                 CurrentTitle = "测量配置"; CurrentPage = _configs; await _configs.LoadAsync(); break;
             case "paths":
