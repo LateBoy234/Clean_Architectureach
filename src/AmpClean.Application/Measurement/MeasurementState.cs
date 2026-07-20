@@ -7,6 +7,7 @@ public enum MeasurementState
     LoadingPoints,
     Moving,
     Measuring,
+    Calibrating,
     Paused,
     Completed,
     Homing,

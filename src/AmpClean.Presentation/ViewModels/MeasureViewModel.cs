@@ -1,12 +1,15 @@
-using System.Collections.ObjectModel;
-using System.Windows;
-using System.Windows.Media;
-using AmpClean.Application.Measurement;
-using AmpClean.Application.Abstractions.Algorithms;
 using AmpClean.Application.Abstractions.Infrastructure;
+using AmpClean.Application.Measurement;
+using AmpClean.Application.Models;
+using AmpClean.Application.Services;
 using AmpClean.Presentation.Model;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Collections.ObjectModel;
+using System.Data;
+using System.Threading;
+using System.Windows;
+using System.Windows.Media;
 
 namespace AmpClean.Presentation.ViewModels;
 
@@ -18,20 +21,18 @@ namespace AmpClean.Presentation.ViewModels;
 public partial class MeasureViewModel : ObservableObject
 {
     private readonly MeasurementWorkflow _workflow;
-    private readonly IMeasurementInstrument _instrument;
-    private readonly IRlsCalibrationCalculator _calculator;
+    private readonly MeasurementCalibrationService _calibrationService;
     private bool _calibrationReady;
 
     public MeasureViewModel(
         MeasurementWorkflow workflow,
-        IMeasurementInstrument instrument,
-        IRlsCalibrationCalculator calculator)
+        MeasurementCalibrationService calibrationService)
     {
         _workflow = workflow;
-        _instrument = instrument;
-        _calculator = calculator;
+        _calibrationService = calibrationService;
         _workflow.StateChanged += OnStateChanged;
         _workflow.SampleCompleted += OnSampleCompleted;
+        _workflow.CalibrationCompleted += OnCalibrationCompleted;
     }
 
     /// <summary>每完成一个点位，状态机便向此集合追加一行假测量数据。</summary>
@@ -70,21 +71,14 @@ public partial class MeasureViewModel : ObservableObject
             CalibrationStatus = "正在读取仪器校准数据…";
             ReadDataList.Clear();
             ResultDataList.Clear();
+            MeasurementData.Clear();
 
-            var dataset = await _instrument.ReadCalibrationDataAsync(cancellationToken);
-            ColsNumber = dataset.ReferenceSamples.FirstOrDefault()?.Count ?? 1;
-            foreach (var value in dataset.ReferenceSamples.SelectMany(row => row))
+            var svdData = await _calibrationService.ReadSvdDataAsync(cancellationToken);
+            ColsNumber = svdData.FirstOrDefault()?.Count ?? 1;
+            foreach (var value in svdData.SelectMany(row => row))
                 ReadDataList.Add(value);
-
-            CalibrationStatus = "校准数据读取完成，正在进行 RLS 计算…";
-            var result = await Task.Run(() => _calculator.Calculate(dataset), cancellationToken);
-            ResultColsNumber = result.Coefficients.FirstOrDefault()?.Count ?? 1;
-            foreach (var value in result.Coefficients.SelectMany(row => row))
-                ResultDataList.Add(value);
-
             _calibrationReady = true;
-            CalibrationStatus =
-                $"RLS 完成：迭代 {result.Iterations} 次，MAE={result.Mae:F6}，RMSE={result.Rmse:F6}";
+            CalibrationStatus = "仪器 SVD 数据读取完成，可以开始自动测量。";
         }
         catch (OperationCanceledException)
         {
@@ -141,18 +135,27 @@ public partial class MeasureViewModel : ObservableObject
             ProgressText = $"{e.CompletedCount} / {e.TotalCount}";
             RemindColor = e.State switch
             {
-                MeasurementState.Completed => Brushes.SeaGreen,
-                MeasurementState.Faulted => Brushes.IndianRed,
-                MeasurementState.Paused => Brushes.DarkOrange,
-                MeasurementState.Moving or MeasurementState.Measuring => Brushes.RoyalBlue,
-                _ => Brushes.Gray
+                MeasurementState.Faulted => Brushes.Orange,
+                _ => Brushes.SeaGreen
             };
-
             // 状态变化后重新计算四个按钮的可用性。
             AutoMeasureCommand.NotifyCanExecuteChanged();
             ContinueMeasureCommand.NotifyCanExecuteChanged();
             StopMeasureCommand.NotifyCanExecuteChanged();
             ReturnToOriginCommand.NotifyCanExecuteChanged();
+        });
+    }
+
+    private void OnCalibrationCompleted(object? sender, CalibrationCompletedEventArgs e)
+    {
+        RunOnUiThread(() =>
+        {
+            ResultDataList.Clear();
+            ResultColsNumber = e.Result.Coefficients.FirstOrDefault()?.Count ?? 1;
+            foreach (var value in e.Result.Coefficients.SelectMany(row => row))
+                ResultDataList.Add(value);
+            CalibrationStatus =
+                $"RLS 完成并已写入仪器：迭代 {e.Result.Iterations} 次，MAE={e.Result.Mae:F6}，RMSE={e.Result.Rmse:F6}";
         });
     }
 

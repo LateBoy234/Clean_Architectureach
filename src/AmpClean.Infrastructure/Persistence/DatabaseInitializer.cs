@@ -11,6 +11,7 @@ public sealed class DatabaseInitializer(SqlSugarContext context)
         var db = context.Database;
         db.CodeFirst.InitTables<MeasureConfig, MotionPath, MeasurementReport,
             MeasurementPoint, SimulationAxisState>();
+        db.CodeFirst.InitTables<InstrumentCalibrationRecord>();
 
         // 各类数据分别检查，避免已有旧数据库时无法补充新版本加入的点位表。
         if (!await db.Queryable<MeasureConfig>().AnyAsync())
@@ -68,5 +69,23 @@ public sealed class DatabaseInitializer(SqlSugarContext context)
 
         if (!await db.Queryable<SimulationAxisState>().AnyAsync())
             await db.Insertable(new SimulationAxisState { Id = 1 }).ExecuteCommandAsync();
+
+        if (!await db.Queryable<InstrumentCalibrationRecord>().AnyAsync())
+        {
+            var svd = Enumerable.Range(0, 8)
+                .Select(i => Enumerable.Range(0, 8).Select(j => 1F + i * .5F + j * .1F).ToArray())
+                .ToArray();
+            var standards = svd.Select(row => new[]
+            {
+                .8F * row[0] + .3F * row[1] + .12F * row[3],
+                .5F * row[0] + .2F * row[2] + .08F * row[5],
+                .6F * row[0] + .15F * row[1] + .1F * row[7]
+            }).ToArray();
+            await db.Insertable(new InstrumentCalibrationRecord
+            {
+                SvdDataJson = System.Text.Json.JsonSerializer.Serialize(svd),
+                StandardDataJson = System.Text.Json.JsonSerializer.Serialize(standards)
+            }).ExecuteCommandAsync();
+        }
     }
 }

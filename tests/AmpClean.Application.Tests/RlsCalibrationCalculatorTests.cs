@@ -1,6 +1,5 @@
 using AmpClean.Application.Algorithms;
 using AmpClean.Application.Models;
-using AmpClean.Infrastructure.Simulation;
 
 namespace AmpClean.Application.Tests;
 
@@ -24,17 +23,4 @@ public sealed class RlsCalibrationCalculatorTests
         Assert.Equal(3F, result.Coefficients[1][0], 3);
     }
 
-    [Fact]
-    public async Task FakeInstrumentCalibration_CanBeCalculatedByRls()
-    {
-        var instrument = new FakeMeasurementInstrument(new SimulationOptions());
-        var dataset = await instrument.ReadCalibrationDataAsync();
-
-        var result = new RlsCalibrationCalculator().Calculate(dataset);
-
-        Assert.Equal(12 * 8, dataset.ReferenceSamples.Sum(row => row.Count));
-        Assert.Equal(8, result.Coefficients.Count);
-        Assert.All(result.Coefficients, row => Assert.Equal(3, row.Count));
-        Assert.True(result.Rmse < 0.001F);
-    }
 }

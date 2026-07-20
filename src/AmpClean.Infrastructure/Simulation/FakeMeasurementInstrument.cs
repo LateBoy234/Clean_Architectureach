@@ -14,46 +14,6 @@ public sealed class FakeMeasurementInstrument(SimulationOptions options) : IMeas
     private readonly TimeSpan _measureDuration =
         TimeSpan.FromMilliseconds(Math.Max(0, options.MeasureDurationMilliseconds));
 
-    /// <summary>
-    /// 返回 12 组、每组 8 个特征的模拟校准数据。
-    /// StandardSamples 使用固定线性关系生成，便于验证 RLS 能恢复稳定的系数矩阵。
-    /// </summary>
-    public Task<CalibrationDataset> ReadCalibrationDataAsync(
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        var references = new List<IReadOnlyList<float>>();
-        var standards = new List<IReadOnlyList<float>>();
-
-        for (var sampleIndex = 0; sampleIndex < 12; sampleIndex++)
-        {
-            var t = sampleIndex + 1F;
-            float[] features =
-            [
-                1F,
-                t,
-                t * t / 10F,
-                MathF.Sin(t),
-                MathF.Cos(t),
-                sampleIndex % 3,
-                sampleIndex % 4,
-                sampleIndex % 5
-            ];
-
-            // 三个标准目标值可类比 XYZ/Lab；这里使用已知系数构造演示数据。
-            float[] targets =
-            [
-                0.8F * features[0] + 0.3F * features[1] + 0.12F * features[3],
-                0.5F * features[0] + 0.2F * features[2] + 0.08F * features[5],
-                0.6F * features[0] + 0.15F * features[1] + 0.1F * features[7]
-            ];
-            references.Add(features);
-            standards.Add(targets);
-        }
-
-        return Task.FromResult(new CalibrationDataset(references, standards));
-    }
-
     public async Task<MeasurementReading> MeasureAsync(
         AxisPosition position,
         CancellationToken cancellationToken = default)

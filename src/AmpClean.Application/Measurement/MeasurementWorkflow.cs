@@ -1,6 +1,7 @@
 using AmpClean.Application.Abstractions.Infrastructure;
 using AmpClean.Application.Abstractions.Persistence;
 using AmpClean.Application.Models;
+using AmpClean.Application.Services;
 using AmpClean.Domain.Entities;
 
 namespace AmpClean.Application.Measurement;
@@ -12,20 +13,23 @@ namespace AmpClean.Application.Measurement;
 public sealed class MeasurementWorkflow(
     IMeasurementPointProvider pointProvider,
     IMotionController motionController,
-    IMeasurementInstrument instrument)
+    IMeasurementInstrument instrument,
+    MeasurementCalibrationService calibrationService)
 {
     private readonly SemaphoreSlim _transitionLock = new(1, 1);
     private IReadOnlyList<MeasurementPoint> _points = [];
     private CancellationTokenSource? _runCancellation;
     private Task? _runningTask;
     private int _nextPointIndex;
+    private readonly List<MeasurementReading> _readings = [];
 
     public MeasurementState State { get; private set; } = MeasurementState.Idle;
     public bool IsRunning => State is MeasurementState.LoadingPoints
-        or MeasurementState.Moving or MeasurementState.Measuring;
+        or MeasurementState.Moving or MeasurementState.Measuring or MeasurementState.Calibrating;
 
     public event EventHandler<MeasurementStateChangedEventArgs>? StateChanged;
     public event EventHandler<MeasurementSampleEventArgs>? SampleCompleted;
+    public event EventHandler<CalibrationCompletedEventArgs>? CalibrationCompleted;
 
     /// <summary>从第一个数据库点位开始一轮全新的自动测量。</summary>
     public async Task StartAsync(CancellationToken cancellationToken = default)
@@ -57,6 +61,7 @@ public sealed class MeasurementWorkflow(
             }
 
             _nextPointIndex = 0;
+            _readings.Clear();
             _runCancellation?.Dispose();
             _runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             _runningTask = RunLoopAsync(_runCancellation.Token);
@@ -144,6 +149,7 @@ public sealed class MeasurementWorkflow(
 
                 ChangeState(MeasurementState.Measuring, $"点位 {point.Sequence} 已到位，正在采集数据…");
                 var reading = await instrument.MeasureAsync(point.ToPosition(), cancellationToken);
+                _readings.Add(reading);
                 SampleCompleted?.Invoke(this,
                     new MeasurementSampleEventArgs(new MeasurementSample(point, reading)));
 
@@ -151,7 +157,10 @@ public sealed class MeasurementWorkflow(
                 _nextPointIndex++;
             }
 
-            ChangeState(MeasurementState.Completed, "全部测量点位已完成。");
+            ChangeState(MeasurementState.Calibrating, "测量完成，正在使用标准数据校准并写入仪器…");
+            var calibration = await calibrationService.CalibrateAndWriteAsync(_readings, cancellationToken);
+            CalibrationCompleted?.Invoke(this, new CalibrationCompletedEventArgs(calibration));
+            ChangeState(MeasurementState.Completed, "全部测量点位已完成，校准结果已写入仪器。");
         }
         catch (OperationCanceledException)
         {

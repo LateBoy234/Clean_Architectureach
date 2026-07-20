@@ -1,6 +1,6 @@
 # AMP Clean Architecture WPF
 
-这是参考 `E:\SQCX\sqcx-main\AMP` 业务概念创建的可运行 WPF 架构骨架。项目使用 .NET 8、SqlSugar、Autofac、CommunityToolkit.Mvvm 与 MaterialDesignThemes，默认通过 SQLite 保存演示数据。
+项目使用 .NET 8、SqlSugar、Autofac、CommunityToolkit.Mvvm 与 MaterialDesignThemes，默认通过 SQLite 保存演示数据。
 
 ## 架构结构图
 
@@ -59,16 +59,6 @@ Clean Architectureach/
    └─ AmpClean.Application.Tests/  # 不启动 UI/数据库的快速测试
 ```
 
-## AMP 业务映射
-
-| 原 AMP 模块 | 新项目位置 | 说明 |
-|---|---|---|
-| `Entitys/MeasureConfig.cs` | `Domain/Entities/MeasureConfig.cs` | 去除 UI/ORM 耦合并加入领域校验 |
-| `Entitys/MotionPath.cs` | `Domain/Entities/MotionPath.cs` | 为运动平台路径保留扩展点 |
-| `Entitys/ReportInfo.cs` | `Domain/Entities/MeasurementReport.cs` | 提供报告查询示范 |
-| `DataBase/*` | `Infrastructure/Persistence/*` | 统一由 SqlSugar 仓储实现 |
-| `MotionPlatform/*` | `Application` 端口 + `Infrastructure` 适配器 | 隔离厂商 DLL |
-| `ViewModels/*` | `Presentation/ViewModels/*` | 使用 CommunityToolkit.Mvvm |
 
 ## 运行
 
@@ -125,11 +115,11 @@ stateDiagram-v2
 
 ### 仪器校准与 RLS
 
-进入“自动测量”页面时，`MeasureViewModel.InitializeAsync` 会调用 `IMeasurementInstrument.ReadCalibrationDataAsync`：
+进入“自动测量”页面时，`MeasureViewModel.InitializeAsync` 通过应用服务读取模拟仪器数据库中的 SVD 数据：
 
 1. 将仪器校准实测矩阵展平显示到 `ReadDataList`。
-2. 将实测矩阵和标准矩阵传入 `RlsCalibrationCalculator`。
-3. 将 RLS 回归系数矩阵显示到 `ResultDataList`。
-4. 只有校准读取及计算成功后才允许启动自动测量。
+2. 自动测量完成后，`MeasurementWorkflow` 将完整测量矩阵交给 `MeasurementCalibrationService`。
+3. 应用服务读取数据库标准矩阵，执行 RLS，并通过仪器校准端口写回系数和误差指标。
+4. ViewModel 只显示系数和状态，不包含矩阵构造、算法或数据库逻辑。
 
-当前模拟仪器提供 12×8 的实测矩阵和 12×3 的标准矩阵，RLS 输出 8×3 的系数矩阵。算法移植自 `sqcx-main/AMP/Algorithm/RLSAlgorithm.cs`，并将原来的 `Dictionary<string, object>` 返回值替换为强类型 `RlsCalculationResult`。
+当前模拟数据库提供 8×8 的 SVD 矩阵和 8×3 的标准矩阵；八个点位测量完成后，RLS 输出 8×3 的系数矩阵并保存到 `InstrumentCalibrationRecord`。算法使用强类型 `RlsCalculationResult` 返回结果。

@@ -1,7 +1,9 @@
 using AmpClean.Application.Abstractions.Infrastructure;
 using AmpClean.Application.Abstractions.Persistence;
+using AmpClean.Application.Algorithms;
 using AmpClean.Application.Measurement;
 using AmpClean.Application.Models;
+using AmpClean.Application.Services;
 using AmpClean.Domain.Entities;
 using AmpClean.Domain.ValueObjects;
 
@@ -19,7 +21,8 @@ public sealed class MeasurementWorkflowTests
             new MeasurementPoint { Sequence = 2, X = 4, Y = 5, Z = 6 }
         };
         var workflow = new MeasurementWorkflow(
-            new StubPointProvider(points), new ImmediateMotionController(), new StubInstrument());
+            new StubPointProvider(points), new ImmediateMotionController(), new StubInstrument(),
+            CreateCalibrationService(points.Length));
         var samples = new List<MeasurementSample>();
         workflow.SampleCompleted += (_, e) => samples.Add(e.Sample);
 
@@ -36,7 +39,7 @@ public sealed class MeasurementWorkflowTests
         var motion = new FirstMoveCanBeCancelledController();
         var workflow = new MeasurementWorkflow(
             new StubPointProvider([new MeasurementPoint { Sequence = 1 }]),
-            motion, new StubInstrument());
+            motion, new StubInstrument(), CreateCalibrationService(1));
 
         var startTask = workflow.StartAsync();
         await motion.FirstMoveStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
@@ -88,12 +91,27 @@ public sealed class MeasurementWorkflowTests
 
     private sealed class StubInstrument : IMeasurementInstrument
     {
-        public Task<CalibrationDataset> ReadCalibrationDataAsync(
-            CancellationToken cancellationToken = default) =>
-            Task.FromResult(new CalibrationDataset([[1F]], [[1F]]));
-
         public Task<MeasurementReading> MeasureAsync(AxisPosition position,
             CancellationToken cancellationToken = default) =>
             Task.FromResult(new MeasurementReading(position, [1F, 2F, 3F], DateTime.UtcNow));
+    }
+
+    private static MeasurementCalibrationService CreateCalibrationService(int sampleCount) =>
+        new(new StubCalibrationStore(sampleCount), new RlsCalibrationCalculator());
+
+    private sealed class StubCalibrationStore(int sampleCount) : IInstrumentCalibrationStore
+    {
+        public Task<IReadOnlyList<IReadOnlyList<float>>> ReadSvdDataAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<IReadOnlyList<float>>>([[1F]]);
+
+        public Task<IReadOnlyList<IReadOnlyList<float>>> ReadStandardDataAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<IReadOnlyList<float>>>(
+                Enumerable.Range(0, sampleCount)
+                    .Select(_ => (IReadOnlyList<float>)[1F]).ToArray());
+
+        public Task WriteCalibrationResultAsync(RlsCalculationResult result,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

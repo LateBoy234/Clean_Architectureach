@@ -67,11 +67,13 @@ public partial class App : System.Windows.Application
         builder.RegisterType<MeasurementPointProvider>().As<IMeasurementPointProvider>().SingleInstance();
         builder.RegisterType<DatabaseSimulatedMotionController>().As<IMotionController>().SingleInstance();
         builder.RegisterType<FakeMeasurementInstrument>().As<IMeasurementInstrument>().SingleInstance();
+        builder.RegisterType<DatabaseInstrumentCalibrationStore>().As<IInstrumentCalibrationStore>().SingleInstance();
 
         // 应用用例与 ViewModel 全部使用构造函数注入。
         builder.RegisterType<DashboardService>().SingleInstance();
         builder.RegisterType<MeasureConfigService>().SingleInstance();
         builder.RegisterType<MeasurementWorkflow>().SingleInstance();
+        builder.RegisterType<MeasurementCalibrationService>().SingleInstance();
         builder.RegisterType<RlsCalibrationCalculator>().As<IRlsCalibrationCalculator>().SingleInstance();
         builder.RegisterType<DashboardViewModel>().SingleInstance();
         builder.RegisterType<ConfigsViewModel>().SingleInstance();
